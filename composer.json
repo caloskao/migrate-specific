@@ -1,0 +1,28 @@
+{
+    "name": "caloskao/migrate-specific",
+    "description": "The Laravel framework artisan CLI extension command.",
+    "type": "library",
+    "keywords": [
+        "database",
+        "mysql",
+        "eloquent",
+        "laravel",
+        "artisan",
+        "migrate"
+    ],
+    "require": {
+        "laravel/framework": "^5.7"
+    },
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Calos Kao",
+            "email": "calos3257@gmail.com"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "CalosKao\\": "src/"
+        }
+    }
+}
