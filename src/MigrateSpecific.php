@@ -65,7 +65,6 @@ class MigrateSpecific extends Command
                         return substr($basename, 0, strrpos($basename, '.'));
                     }))
                     ->update(['batch' => $maxBatch]);
-                $this->confirm($countExistsMigration);
                 $pathForArtisan = str_replace(base_path(), '', $tmpPath);
 
                 // If migration have migrated, rollback first.
