@@ -40,43 +40,45 @@ class MigrateSpecific extends Command
      */
     public function handle()
     {
+        $files = $this->argument('files');
         $tmpPath = tempnam(database_path(), 'migrate_file_');
         if ( file_exists($tmpPath) ) {
             unlink($tmpPath);
         }
         mkdir($tmpPath, 0777, true);
-        $files = $this->argument('files');
-
-        foreach ($files as $pathSrc) {
-            $pathDst = $tmpPath.'/'.basename($pathSrc);
-            $this->line("Copy {$pathSrc}");
-            copy($pathSrc, $pathDst);
-        }
-
-        $list = collect(glob("{$tmpPath}/*"));
-        $this->line('There is ready to migrate files:');
-        $this->line($list->map(function($v){ return '  '.basename($v); })->implode(PHP_EOL));
-        if ( $this->confirm('Is this correct?') ) {
-            $this->line("Start migrate ...");
-            $maxBatch = (int)DB::table('migrations')->max('batch') + 1;
-            $countExistsMigration = DB::table('migrations')
-                ->whereIn('migration', $list->map(function($path){
-                    $basename = basename($path);
-                    return substr($basename, 0, strrpos($basename, '.'));
-                }))
-                ->update(['batch' => $maxBatch]);
-            $this->confirm($countExistsMigration);
-            $pathForArtisan = str_replace(base_path(), '', $tmpPath);
-
-            // If migration have migrated, rollback first.
-            if ( 0 < $countExistsMigration ) {
-                $this->call('migrate:rollback', ['--path' => $pathForArtisan]);
+        try {
+            foreach ($files as $pathSrc) {
+                $pathDst = $tmpPath.'/'.basename($pathSrc);
+                $this->line("Copy {$pathSrc}");
+                copy($pathSrc, $pathDst);
             }
-            $this->call('migrate', ['--path' => $pathForArtisan]);
-        } else {
-            $this->info('Abort.');
+
+            $list = collect(glob("{$tmpPath}/*"));
+            $this->line('There is ready to migrate files:');
+            $this->line($list->map(function($v){ return '  '.basename($v); })->implode(PHP_EOL));
+            if ( $this->confirm('Is this correct?') ) {
+                $this->line("Start migrate ...");
+                $maxBatch = (int)DB::table('migrations')->max('batch') + 1;
+                $countExistsMigration = DB::table('migrations')
+                    ->whereIn('migration', $list->map(function($path){
+                        $basename = basename($path);
+                        return substr($basename, 0, strrpos($basename, '.'));
+                    }))
+                    ->update(['batch' => $maxBatch]);
+                $this->confirm($countExistsMigration);
+                $pathForArtisan = str_replace(base_path(), '', $tmpPath);
+
+                // If migration have migrated, rollback first.
+                if ( 0 < $countExistsMigration ) {
+                    $this->call('migrate:rollback', ['--path' => $pathForArtisan]);
+                }
+                $this->call('migrate', ['--path' => $pathForArtisan]);
+            } else {
+                $this->info('Abort.');
+            }
+        } finally {
+            array_map('unlink', glob($tmpPath."/*"));
+            rmdir($tmpPath);
         }
-        array_map('unlink', glob($tmpPath."/*"));
-        rmdir($tmpPath);
     }
 }
