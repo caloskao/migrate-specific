@@ -1,6 +1,9 @@
 # Migrate Specific
 Migrate Specific is a Laravel framework Artisan CLI extension command, when you only want to migrate some specific migration files, you can use it for database migration.
 
+# Requirement
+laravel/framework v5.0.0 or later.
+
 # Installation
 
 Run command in your Laravel project root directory:
