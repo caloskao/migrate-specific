@@ -101,5 +101,9 @@ Migrating: 2018_07_31_185911_create_failed_jobs_table
 Migrated:  2018_07_31_185911_create_failed_jobs_table
 ```
 
+## Note
+
+You can directly run migration with non-interative mode by `-n`, `--no-interactive`, `-q` or `--quiet` option.
+
 # License
 The Migrate Specific extension is open-sourced software licensed under the MIT license.

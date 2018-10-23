@@ -54,9 +54,16 @@ class MigrateSpecific extends Command
             }
 
             $list = collect(glob("{$tmpPath}/*"));
-            $this->line('There is ready to migrate files:');
-            $this->line($list->map(function($v){ return '  '.basename($v); })->implode(PHP_EOL));
-            if ( $this->confirm('Is this correct?') ) {
+            $allowExec = false;
+            if ( $this->option('quiet') || $this->option('no-interaction') ) {
+                $allowExec = true;
+            } else {
+                $this->line('There is ready to migrate files:');
+                $this->line($list->map(function($v){ return '  '.basename($v); })->implode(PHP_EOL));
+                $allowExec = $this->confirm('Is this correct?');
+            }
+
+            if ( $allowExec ) {
                 $this->line("Start migrate ...");
                 $maxBatch = (int)DB::table('migrations')->max('batch') + 1;
                 $countExistsMigration = DB::table('migrations')
