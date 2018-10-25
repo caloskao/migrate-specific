@@ -115,6 +115,12 @@ class MigrateSpecific extends Command {
             rmdir($tmpPath);
         }
     }
+
+    /**
+     * Print package infomation.
+     *
+     * @return void
+     */
     private function printHeaderInfo() {
         $this->comment('MigrateSpecific v1.2.0');
         $this->line('Copyright (C) 2018 by CalosKao');
@@ -122,11 +128,27 @@ class MigrateSpecific extends Command {
         $this->info('https://github.com/caloskao/migrate-specific'.PHP_EOL);
     }
 
+    /**
+     * Call artisan migrate command.
+     *
+     * @param  string $mode The artisan migrate command execute mode, avairable option: default, refresh, reset.
+     *
+     * @return string $value Sub command output.
+     */
     private function migrate(string $mode = 'default') {
         $mode = ('default' === $mode ? '' : ":{$mode}");
         return $this->callArtisanBySymfony("migrate{$mode}", ['--path' => $this->migratePath], 'not found');
     }
 
+    /**
+     * Call artisan command by Symfony.
+     *
+     * @param  string $command           Artisan command name.
+     * @param  array  $args              Command arguments.
+     * @param  string $lineFilterKeyword Filter output line by keyword.
+     *
+     * @return string Command output.
+     */
     private function callArtisanBySymfony(string $command, array $args = [], string $lineFilterKeyword = null) {
         $output = new BufferedOutput;
         $instance = $this->getApplication()->find($command);
