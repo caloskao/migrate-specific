@@ -32,7 +32,7 @@ class MigrateSpecific extends Command {
      *
      * @var string
      */
-    protected $description = 'Migrate, refresh or reset for specific database migration files.';
+    protected $description = 'Easily execute database migration of specific files in the Laravel framework.';
 
     /**
      * Input migration files name.
@@ -71,7 +71,7 @@ class MigrateSpecific extends Command {
         }
 
         $files = $this->argument('files');
-        $tmpPath = tempnam(database_path(), 'migrate_file_');
+        $tmpPath = tempnam(storage_path(), 'migrate-specific_');
         if ( file_exists($tmpPath) ) {
             unlink($tmpPath);
         }
@@ -131,7 +131,7 @@ class MigrateSpecific extends Command {
      * @return void
      */
     private function printHeaderInfo() {
-        $this->comment('MigrateSpecific v1.2.0');
+        $this->comment('MigrateSpecific v1.2.1');
         $this->line('Copyright (C) 2018 by CalosKao');
         $this->line('If you have any problem or bug about the use, please come to Github to open the question.');
         $this->info('https://github.com/caloskao/migrate-specific'.PHP_EOL);

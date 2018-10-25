@@ -77,7 +77,7 @@ php artisan migrate:specific database/migrations/2014_10_12_000000_create_users_
 Output is like below:
 
 ```
-MigrateSpecific v1.2.0
+MigrateSpecific v1.2.1
 Copyright (C) 2018 by CalosKao
 If you have any problem or bug about the use, please come to Github to open the question.
 https://github.com/caloskao/migrate-specific
