@@ -1,5 +1,5 @@
-# Migrate Specific
-Migrate Specific is a Laravel framework Artisan CLI extension command, when you only want to migrate some specific migration files, you can use it for database migration.
+# MigrateSpecific
+MigrateSpecific is a Laravel framework Artisan CLI extension command that helps you easily perform database migrations of specific migration files in the Laravel framework.
 
 # Requirement
 laravel/framework v5.0.0 or later.
@@ -29,25 +29,27 @@ Now, run `php artisan` , you can see `migrate:specific` in the migrate section:
   migrate:refresh      Reset and re-run all migrations
   migrate:reset        Rollback all database migrations
   migrate:rollback     Rollback the last database migration
-  migrate:specific     Migrate specific files.
+  migrate:specific     Migrate, refresh or reset for specific database migration files.
   migrate:status       Show the status of each migration
 ```
 
 # Usage
 
-You can run command `php artisan help migrate:specific` to check command usage:
+You can run `php artisan help migrate:specific` to check command usage:
 
 ```
 Description:
-  Migrate specific files.
+  Easily execute database migration of specific files in the Laravel framework.
 
 Usage:
-  migrate:specific <files>...
+  migrate:specific [options] [--] <files>...
 
 Arguments:
   files                 File path, support multiple file (Sperate by space).
 
 Options:
+  -m, --mode[=MODE]     Set migrate exection mode, supported mode have: default, refresh, rollback, new-batch [default: "default"]
+  -y, --assume-yes      Automatic yes to prompts; assume "yes" as answer to all prompts and run non-interactively. The process will be automatic assume yes as answer when  you used option "-n" or "-q".
   -h, --help            Display this help message
   -q, --quiet           Do not output any message
   -V, --version         Display this application version
@@ -58,27 +60,29 @@ Options:
   -v|vv|vvv, --verbose  Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug
 ```
 
-# Examples
+# Basic usage
 
-Migrate single file:
+### Migrate single file:
 
 ```
 php artisan migrate:specific database/migrations/table.php
 ```
 
-Migrate mutiple files:
+### Migrate mutiple files:
 
 ```
-php artisan migrate:specific database/migrations/table-1.php /home/caloskao/my_migration.php /other-migrations/*
+php artisan migrate:specific database/migrations/2014_10_12_000000_create_users_table.php /home/caloskao/2018*
 ```
 
 Output is like below:
 
 ```
-Copy database/migrations/2014_10_12_000000_create_users_table.php
-Copy database/migrations/2018_07_31_174401_create_jobs_table.php
-Copy database/migrations/2018_07_31_185911_create_failed_jobs_table.php
-There is ready to migrate files:
+MigrateSpecific v1.2.0
+Copyright (C) 2018 by CalosKao
+If you have any problem or bug about the use, please come to Github to open the question.
+https://github.com/caloskao/migrate-specific
+
+The following migration files will be migrated:
   2014_10_12_000000_create_users_table.php
   2018_07_31_174401_create_jobs_table.php
   2018_07_31_185911_create_failed_jobs_table.php
@@ -86,13 +90,6 @@ There is ready to migrate files:
  Is this correct? (yes/no) [no]:
  > yes
 
-Start migrate ...
-Rolling back: 2018_07_31_185911_create_failed_jobs_table
-Rolled back:  2018_07_31_185911_create_failed_jobs_table
-Rolling back: 2018_07_31_174401_create_jobs_table
-Rolled back:  2018_07_31_174401_create_jobs_table
-Rolling back: 2014_10_12_000000_create_users_table
-Rolled back:  2014_10_12_000000_create_users_table
 Migrating: 2014_10_12_000000_create_users_table
 Migrated:  2014_10_12_000000_create_users_table
 Migrating: 2018_07_31_174401_create_jobs_table
@@ -101,9 +98,34 @@ Migrating: 2018_07_31_185911_create_failed_jobs_table
 Migrated:  2018_07_31_185911_create_failed_jobs_table
 ```
 
-## Note
+# Migrate mode
 
-You can directly run migration with non-interative mode by `-n`, `--no-interactive`, `-q` or `--quiet` option.
+MigrateSpecific support you execute `migrate:refresh` and `migrate:reset` command for specific database migration file, call `migrate:specific` with option `-m`.
+
+### Refresh specific database migration
+
+```
+php artisan migrate:specific -m refresh /path/to/migration.php
+```
+
+### Reset specific database migration
+
+```
+php artisan migrate:specific -m reset /path/to/migration.php
+```
+
+# Using MigrateSpecific in non-interactive mode
+
+Sometimes we need to perform a database migration many times, or we need to deploy it into an automated process. At this time, we can use the option `-y` to directly perform database migration without confirmation.
+
+```
+php artisan migrate:specific -y /path/to/migration.php
+```
+
+**Note:**
+
+ * If you call the option `-n` or `-q`, MigrateSpecific will be automatically enable option `-y`.
+ * **If you are not using MigrateSpecific in the above situations, we recommend that you do not perform database migration in non-interactive mode to avoid accidental loss of data.**
 
 # License
 The Migrate Specific extension is open-sourced software licensed under the MIT license.
