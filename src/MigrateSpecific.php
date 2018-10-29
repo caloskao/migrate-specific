@@ -33,7 +33,7 @@ class MigrateSpecific extends Command {
      *
      * @var string
      */
-    protected $description = 'Easily perform database migrations on specific files.';
+    protected $description = 'Migrate, refresh, reset or rollback for specific migration files.';
 
     /**
      * Input migration files name.
@@ -158,7 +158,7 @@ class MigrateSpecific extends Command {
      * @return void
      */
     private function printHeaderInfo() {
-        $this->comment('MigrateSpecific v1.2.1');
+        $this->comment('MigrateSpecific v1.3.0');
         $this->line('Copyright (C) 2018 by CalosKao');
         $this->line('If you have any problem or bug about the use, please come to Github to open the question.');
         $this->info('https://github.com/caloskao/migrate-specific'.PHP_EOL);

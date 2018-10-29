@@ -36,7 +36,7 @@ Now, run `php artisan` , you can see `migrate:specific` in the migrate section:
   migrate:refresh      Reset and re-run all migrations
   migrate:reset        Rollback all database migrations
   migrate:rollback     Rollback the last database migration
-  migrate:specific     Migrate, refresh or reset for specific database migration files.
+  migrate:specific     Migrate, refresh, reset or rollback for specific migration files.
   migrate:status       Show the status of each migration
 ```
 
@@ -46,16 +46,17 @@ You can run `php artisan help migrate:specific` to check command usage:
 
 ```
 Description:
-  Easily execute database migration of specific files in the Laravel framework.
+  Migrate, refresh, reset or rollback for specific migration files.
 
 Usage:
   migrate:specific [options] [--] <files>...
 
 Arguments:
-  files                 File path, support multiple file (Sperate by space).
+  files                 File path, support multiple file. (Sperate by space)
 
 Options:
-  -m, --mode[=MODE]     Set migrate exection mode, supported mode have: default, refresh, rollback, new-batch [default: "default"]
+  -k, --keep-batch      Keep batch number. (Only works in refresh mode)
+  -m, --mode[=MODE]     Set migrate execution mode, supported mode have: default, refresh, reset [default: "default"]
   -y, --assume-yes      Automatic yes to prompts; assume "yes" as answer to all prompts and run non-interactively. The process will be automatic assume yes as answer when  you used option "-n" or "-q".
   -h, --help            Display this help message
   -q, --quiet           Do not output any message
@@ -84,7 +85,7 @@ php artisan migrate:specific database/migrations/2014_10_12_000000_create_users_
 Output is like below:
 
 ```
-MigrateSpecific v1.2.1
+MigrateSpecific v1.3.0
 Copyright (C) 2018 by CalosKao
 If you have any problem or bug about the use, please come to Github to open the question.
 https://github.com/caloskao/migrate-specific
@@ -107,18 +108,17 @@ Migrated:  2018_07_31_185911_create_failed_jobs_table
 
 # Migrate mode
 
-MigrateSpecific support you execute `migrate:refresh` and `migrate:reset` command for specific database migration file, call `migrate:specific` with option `-m`.
-
-### Refresh specific database migration
+MigrateSpecific support you execute `migrate:refresh`, `migrate:reset` or `migrate:rollback` command for specific migration file, call `migrate:specific` with option `-m`.
 
 ```
+# Refresh mode
 php artisan migrate:specific -m refresh /path/to/migration.php
-```
 
-### Reset specific database migration
-
-```
+# Reset mode
 php artisan migrate:specific -m reset /path/to/migration.php
+
+# Rollback mode
+php artisan migrate:specific -m rollback /path/to/migration.php
 ```
 
 # Using MigrateSpecific in non-interactive mode
