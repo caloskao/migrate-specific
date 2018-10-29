@@ -33,7 +33,7 @@ class MigrateSpecific extends Command {
      *
      * @var string
      */
-    protected $description = 'Easily execute database migration of specific files in the Laravel framework.';
+    protected $description = 'Easily perform database migrations on specific files.';
 
     /**
      * Input migration files name.
@@ -73,7 +73,7 @@ class MigrateSpecific extends Command {
     public function handle() {
         $this->printHeaderInfo();
         $mode = $this->option('mode');
-        if ( !in_array($mode, ['default', 'refresh', 'reset']) ) {
+        if ( !in_array($mode, ['default', 'rollback', 'refresh', 'reset']) ) {
             $this->error("Invalid migrate mode: {$mode}");
             return false;
         }
@@ -106,6 +106,11 @@ class MigrateSpecific extends Command {
                         $displayActionWord = 'reset';
                         $warningMsg .= 'reset specific migrations.';
                         break;
+
+                    case 'rollback':
+                        $displayActionWord = 'rolled back';
+                        $warningMsg .= 'roll back specific migrations.';
+                        break;
                 }
 
                 $this->comment($warningMsg . PHP_EOL);
@@ -121,8 +126,12 @@ class MigrateSpecific extends Command {
 
             $subCommand = '';
             switch ($mode) {
-                default: $this->call('migrate', ['--path' => $this->migratePath]); break;
-                case 'reset': $this->line($this->migrate('reset')); break;
+                default:
+                case 'reset':
+                case 'rollback':
+                    $this->line($this->migrate($mode));
+                    break;
+
                 case 'refresh':
                     $newBatchNumber = (int)DB::table('migrations')->max('batch') + 1;
                     $countExistsMigration = DB::table('migrations')
