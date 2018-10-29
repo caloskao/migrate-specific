@@ -23,8 +23,9 @@ class MigrateSpecific extends Command {
      * @var string
      */
     protected $signature = 'migrate:specific
-                            {files* : File path, support multiple file (Sperate by space).}
-                            {--m|mode=default : Set migrate exection mode, supported mode have: default, refresh, rollback, new-batch }
+                            {files* : File path, support multiple file. (Sperate by space)}
+                            {--k|keep-batch : Keep batch number. (Only works in refresh mode)}
+                            {--m|mode=default : Set migrate execution mode, supported mode have: default, refresh, reset }
                             {--y|assume-yes : Automatic yes to prompts; assume "yes" as answer to all prompts and run non-interactively. The process will be automatic assume yes as answer when  you used option "-n" or "-q". }';
 
     /**
@@ -47,6 +48,13 @@ class MigrateSpecific extends Command {
      * @var string
      */
     private $migratePath;
+
+    /**
+     * Temporary store history batch number to restore when option -k is enabled.
+     *
+     * @var string
+     */
+    private $batchHistory;
 
     /**
      * Create a new command instance.
@@ -83,15 +91,28 @@ class MigrateSpecific extends Command {
                 copy($pathSrc, $pathDst);
             }
 
-            $list = collect(glob("{$tmpPath}/*"));
+            $migrationsFilename = self::parseFilename(glob("{$tmpPath}/*"));
             $isContinueConfirm = ( $this->option('assume-yes') || $this->option('quiet') || $this->option('no-interaction') );
             if ( false === $isContinueConfirm ) {
+                $displayActionWord = 'migrated';
+                $warningMsg = "Warning: You have switched to {$mode} mode, which means the migrate:specific command will ";
                 switch ($mode) {
-                    case 'reset':   $this->comment('Warning: You have switched to reset mode, which means the migrate:specific command will reset specific migration operations.'.PHP_EOL); break;
-                    case 'refresh': $this->comment('Warning: You have switched to refresh mode, which means the migrate:specific command will reset specific migrations and then execute the migrate command.'.PHP_EOL); break;
+                    case 'refresh':
+                        $displayActionWord = 'refreshed';
+                        $warningMsg .= 'refresh specific migrations and then execute the migrate command.';
+                        break;
+
+                    case 'reset':
+                        $displayActionWord = 'reset';
+                        $warningMsg .= 'reset specific migrations.';
+                        break;
                 }
-                $this->line('The following migration files will be migrated:');
-                $this->line($list->map(function($v){ return '  '.basename($v); })->implode(PHP_EOL));
+
+                $this->comment($warningMsg . PHP_EOL);
+                $this->line("The following migrations will be {$displayActionWord}:");
+                foreach ($migrationsFilename as $migration) {
+                    $this->line("  {$migration}");
+                }
                 if ( false === $this->confirm('Do you want to continue?') ) {
                     $this->line('Abort.');
                     return false;
@@ -105,10 +126,7 @@ class MigrateSpecific extends Command {
                 case 'refresh':
                     $newBatchNumber = (int)DB::table('migrations')->max('batch') + 1;
                     $countExistsMigration = DB::table('migrations')
-                        ->whereIn('migration', $list->map(function($path){
-                            $basename = basename($path);
-                            return substr($basename, 0, strrpos($basename, '.'));
-                        }))
+                        ->whereIn('migration', $migrationsFilename)
                         ->update(['batch' => $newBatchNumber]);
 
                     // If migration status is migrated, reset it first.
@@ -170,5 +188,30 @@ class MigrateSpecific extends Command {
             })->implode(PHP_EOL);
         }
         return $outputText;
+    }
+
+    private function fetchBatchHistory(array $migrations) {
+        $this->batchHistory = DB::table('migrations')
+            ->whereIn('migration', $migrations)
+            ->get()
+            ->toArray();
+    }
+
+    private function restoreBatch() {
+        $this->batchHistory->each(function($item){
+            DB::table('migrations')
+                ->where('migration', $item->migration)
+                ->update([
+                    'id'    => $item->id,
+                    'batch' => $item->batch,
+                ]);
+        });
+    }
+
+    private static function parseFilename(array $files){
+        return collect($files)->map(function($path){
+            $basename = basename($path);
+            return substr($basename, 0, strrpos($basename, '.'));
+        })->toArray();
     }
 }
