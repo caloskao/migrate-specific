@@ -85,11 +85,6 @@ php artisan migrate:specific database/migrations/2014_10_12_000000_create_users_
 Output is like below:
 
 ```
-MigrateSpecific v1.3.0
-Copyright (C) 2018 by CalosKao
-If you have any problem or bug about the use, please come to Github to open the question.
-https://github.com/caloskao/migrate-specific
-
 The following migration files will be migrated:
   2014_10_12_000000_create_users_table.php
   2018_07_31_174401_create_jobs_table.php

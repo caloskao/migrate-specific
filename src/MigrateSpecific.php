@@ -124,7 +124,6 @@ class MigrateSpecific extends Command {
                 }
             }
 
-            $subCommand = '';
             switch ($mode) {
                 default:
                 case 'reset':
@@ -133,6 +132,10 @@ class MigrateSpecific extends Command {
                     break;
 
                 case 'refresh':
+                    if ($this->option('keep-batch')) {
+                        $this->backupBatchHistory($migrationsFilename);
+                        $this->comment('');
+                    }
                     $newBatchNumber = (int)DB::table('migrations')->max('batch') + 1;
                     $countExistsMigration = DB::table('migrations')
                         ->whereIn('migration', $migrationsFilename)
@@ -143,6 +146,10 @@ class MigrateSpecific extends Command {
                         $this->line($this->migrate('reset'));
                     }
                     $this->call('migrate', ['--path' => $this->migratePath]);
+
+                    if ($this->option('keep-batch')) {
+                        $this->restoreBatchHistory();
+                    }
                     break;
             }
 
@@ -158,8 +165,8 @@ class MigrateSpecific extends Command {
      * @return void
      */
     private function printHeaderInfo() {
-        $this->comment('MigrateSpecific v1.3.0');
-        $this->line('Copyright (C) 2018 by CalosKao');
+        $this->comment('MigrateSpecific v1.3.1');
+        $this->line('Copyright (C) 2018 by Calos Kao');
         $this->line('If you have any problem or bug about the use, please come to Github to open the question.');
         $this->info('https://github.com/caloskao/migrate-specific'.PHP_EOL);
     }
@@ -174,6 +181,36 @@ class MigrateSpecific extends Command {
     private function migrate(string $mode = 'default') {
         $mode = ('default' === $mode ? '' : ":{$mode}");
         return $this->callArtisanBySymfony("migrate{$mode}", ['--path' => $this->migratePath], 'not found');
+    }
+
+    /**
+     * Backup migration original batch.
+     *
+     * @param  array $migrations The database records of migrations.
+     *
+     * @return void
+     */
+    private function backupBatchHistory(array $migrations) {
+        $this->batchHistory = DB::table('migrations')
+            ->whereIn('migration', $migrations)
+            ->get()
+            ->toArray();
+    }
+
+    /**
+     * Restore migration original batch and id.
+     *
+     * @return void
+     */
+    private function restoreBatchHistory() {
+        foreach ($this->batchHistory as $item) {
+            DB::table('migrations')
+                ->where('migration', $item->migration)
+                ->update([
+                    'id'    => $item->id,
+                    'batch' => $item->batch,
+                ]);
+        }
     }
 
     /**
@@ -199,24 +236,13 @@ class MigrateSpecific extends Command {
         return $outputText;
     }
 
-    private function fetchBatchHistory(array $migrations) {
-        $this->batchHistory = DB::table('migrations')
-            ->whereIn('migration', $migrations)
-            ->get()
-            ->toArray();
-    }
-
-    private function restoreBatch() {
-        $this->batchHistory->each(function($item){
-            DB::table('migrations')
-                ->where('migration', $item->migration)
-                ->update([
-                    'id'    => $item->id,
-                    'batch' => $item->batch,
-                ]);
-        });
-    }
-
+    /**
+     * Strip path and extension for files.
+     *
+     * @param array $files The full path infomation of the file.
+     *
+     * @return array File names.
+     */
     private static function parseFilename(array $files){
         return collect($files)->map(function($path){
             $basename = basename($path);
