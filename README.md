@@ -6,10 +6,10 @@
 [![GitHub license](https://img.shields.io/github/license/caloskao/migrate-specific.svg)](https://github.com/caloskao/migrate-specific/blob/master/LICENSE)
 [![Total Downloads](https://img.shields.io/packagist/dt/caloskao/migrate-specific.svg)](https://packagist.org/packages/caloskao/migrate-specific)
 
-MigrateSpecific is a Laravel framework Artisan CLI extension command that helps you easily perform database migrations of specific migration files in the Laravel framework.
+MigrateSpecific is a Laravel framework Artisan CLI extension command that helps you easily perform database migrations of specific migration files.
 
 # Requirement
-laravel/framework v5.0.0 or later.
+laravel/framework v5.4.0 or later.
 
 # Installation
 

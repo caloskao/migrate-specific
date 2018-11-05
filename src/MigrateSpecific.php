@@ -165,7 +165,7 @@ class MigrateSpecific extends Command {
      * @return void
      */
     private function printHeaderInfo() {
-        $this->comment('MigrateSpecific v1.3.1');
+        $this->comment('MigrateSpecific v1.3.2');
         $this->line('Copyright (C) 2018 by Calos Kao');
         $this->line('If you have any problem or bug about the use, please come to Github to open the question.');
         $this->info('https://github.com/caloskao/migrate-specific'.PHP_EOL);
@@ -178,7 +178,7 @@ class MigrateSpecific extends Command {
      *
      * @return string $value Sub command output.
      */
-    private function migrate(string $mode = 'default') {
+    private function migrate($mode = 'default') {
         $mode = ('default' === $mode ? '' : ":{$mode}");
         return $this->callArtisanBySymfony("migrate{$mode}", ['--path' => $this->migratePath], 'not found');
     }
@@ -222,7 +222,7 @@ class MigrateSpecific extends Command {
      *
      * @return string Command output.
      */
-    private function callArtisanBySymfony(string $command, array $args = [], string $lineFilterKeyword = null) {
+    private function callArtisanBySymfony($command, array $args = [], $lineFilterKeyword = null) {
         $output = new BufferedOutput;
         $instance = $this->getApplication()->find($command);
         $instance->run(new ArrayInput($args), $output);
