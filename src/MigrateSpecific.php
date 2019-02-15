@@ -24,7 +24,7 @@ class MigrateSpecific extends Command {
      * @var string
      */
     protected $signature = 'migrate:specific
-                            {files?* : File or directory path, support multiple file (Sperate by space)}
+                            {files?* : File or directory path, support multiple file (Sperate by space)  [default: "database/migrations"]}
                             {--p|pretend : Dump the SQL queries that would be run}
                             {--f|skip-foreign-key-checks : Set FOREIGN_KEY_CHECKS=0 before migrate}
                             {--k|keep-batch : Keep batch number. (Only works in refresh mode)}
