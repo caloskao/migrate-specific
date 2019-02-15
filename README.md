@@ -9,7 +9,7 @@
 MigrateSpecific is a Laravel framework Artisan CLI extension command that helps you easily perform database migrations of specific migration files.
 
 # Requirement
-laravel/framework v5.4.0 or later.
+laravel/framework v5.7 or later.
 
 # Installation
 
@@ -46,40 +46,42 @@ You can run `php artisan help migrate:specific` to check command usage:
 
 ```
 Description:
-  Migrate, refresh, reset or rollback for specific migration files.
+  Migrate, rollback or refresh for specific migration files.
 
 Usage:
-  migrate:specific [options] [--] <files>...
+  migrate:specific [options] [--] [<files?*>]
 
 Arguments:
-  files                 File path, support multiple file. (Sperate by space)
+  files?*                        File or directory path, support multiple file. (Sperate by space) [default: "database/migrations"]
 
 Options:
-  -k, --keep-batch      Keep batch number. (Only works in refresh mode)
-  -m, --mode[=MODE]     Set migrate execution mode, supported mode have: default, refresh, reset [default: "default"]
-  -y, --assume-yes      Automatic yes to prompts; assume "yes" as answer to all prompts and run non-interactively. The process will be automatic assume yes as answer when  you used option "-n" or "-q".
-  -h, --help            Display this help message
-  -q, --quiet           Do not output any message
-  -V, --version         Display this application version
-      --ansi            Force ANSI output
-      --no-ansi         Disable ANSI output
-  -n, --no-interaction  Do not ask any interactive question
-      --env[=ENV]       The environment the command should run under
-  -v|vv|vvv, --verbose  Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug
+      --database                 The database connection to use
+  -f, --skip-foreign-key-checks  Set FOREIGN_KEY_CHECKS=0 before migrate.
+  -k, --keep-batch               Keep batch number. (Only works in refresh mode)
+  -m, --mode[=MODE]              Set migrate execution mode, supported mode have: default, refresh [default: "default"]
+  -y, --assume-yes               Automatically assumes "yes" to run commands in non-interactive mode. This option is automatically enabled if you use the option "-n" or "-q".
+  -h, --help                     Display this help message
+  -q, --quiet                    Do not output any message
+  -V, --version                  Display this application version
+      --ansi                     Force ANSI output
+      --no-ansi                  Disable ANSI output
+  -n, --no-interaction           Do not ask any interactive question
+      --env[=ENV]                The environment the command should run under
+  -v|vv|vvv, --verbose           Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug
 ```
 
 # Basic usage
 
-### Migrate single file:
+### Migrate single file or directory:
 
 ```
-php artisan migrate:specific database/migrations/table.php
+php artisan migrate:specific <path>
 ```
 
 ### Migrate mutiple files:
 
 ```
-php artisan migrate:specific database/migrations/2014_10_12_000000_create_users_table.php /home/caloskao/2018*
+php artisan migrate:specific <file 1> <file 2> <file 3> ...
 ```
 
 Output is like below:
@@ -103,17 +105,49 @@ Migrated:  2018_07_31_185911_create_failed_jobs_table
 
 # Migrate mode
 
-MigrateSpecific support you execute `migrate:refresh`, `migrate:reset` or `migrate:rollback` command for specific migration file, call `migrate:specific` with option `-m`.
+Use option `-m` or `--mode` to run `migrate:refresh` or `migrate:rollback` for specific migrations.
 
 ```
-# Refresh mode
-php artisan migrate:specific -m refresh /path/to/migration.php
-
-# Reset mode
-php artisan migrate:specific -m reset /path/to/migration.php
-
 # Rollback mode
-php artisan migrate:specific -m rollback /path/to/migration.php
+php artisan migrate:specific -m rollback <files>
+
+# Refresh mode
+php artisan migrate:specific -m refresh <files>
+```
+
+# Keep batch in refresh mode
+
+Use option `-k` or `--keep-batch` to keep migration batch.
+
+Before migrate:
+
+| Ran? | Migration                                             | Batch |
+|------|-------------------------------------------------------|-------|
+| Yes  | 2019_02_14_011711_create_password_resets_table        | 1     |
+| Yes  | 2019_02_14_011711_create_users_table                  | 2     |
+
+```
+php artisan migrate:specific -m refresh -k database/migrations/2019_02_14_011711_create_password_resets_table.php
+```
+
+Run `php artisan migrate:status` after migrate, you can see the migration `2019_02_14_011711_create_password_resets_table` batch number will not be changed.
+
+# Skip foreign key checks
+
+If your pattern has foreign key constraints, sometimes you might get SQL error 1451:
+
+```
+Rolling back: 2019_02_14_011711_create_users_table
+SQLSTATE[23000]: Integrity constraint violation: 1451 Cannot delete or update a parent row: a foreign key constraint fails (SQL: drop table `users`)
+```
+
+Use option `-f` of `--skip-foreign-key-checks` to execute database statement `SET FOREIGN_KEY_CHECKS=0` before migrate.
+
+**Note:** A good practice is to rollback related foreign key migration at the same time, otherwise you may still get other errors, such as SQL Error 1091.
+
+```
+Rolling back: 2019_02_14_011711_create_users_table
+SQLSTATE[42000]: Syntax error or access violation: 1091 Can't DROP FOREIGN KEY `fk_projects_users_1`; check that it exists (SQL: alter table `reports` drop foreign key `fk_projects_users_1`)
 ```
 
 # Using MigrateSpecific in non-interactive mode
@@ -121,7 +155,7 @@ php artisan migrate:specific -m rollback /path/to/migration.php
 Sometimes we need to perform a database migration many times, or we need to deploy it into an automated process. At this time, we can use the option `-y` to directly perform database migration without confirmation.
 
 ```
-php artisan migrate:specific -y /path/to/migration.php
+php artisan migrate:specific -y <files>
 ```
 
 **Note:**
