@@ -25,7 +25,7 @@ class MigrateSpecific extends Command {
     protected $signature = 'migrate:specific
                             {files?* : File or directory path, support multiple file (Sperate by space)}
                             {--k|keep-batch : Keep batch number. (Only works in refresh mode)}
-                            {--m|mode=default : Set migrate execution mode, supported mode have: default, refresh }
+                            {--m|mode=default : Set migrate execution mode, supported mode have: default, rollback, refresh }
                             {--y|assume-yes : Automatically assumes "yes" to run commands in non-interactive mode. This option is automatically enabled if you use the option "-n" or "-q" }';
 
     /**
@@ -173,7 +173,7 @@ class MigrateSpecific extends Command {
      */
     private function checkMigrateMode() {
         $mode = $this->option('mode');
-        if ( !in_array($mode, ['default', 'rollback', 'refresh', 'reset']) ) {
+        if ( !in_array($mode, ['default', 'rollback', 'refresh']) ) {
             throw new \Exception("Invalid migrate mode: {$mode}");
         }
     }
