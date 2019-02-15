@@ -25,6 +25,7 @@ class MigrateSpecific extends Command {
      */
     protected $signature = 'migrate:specific
                             {files?* : File or directory path, support multiple file (Sperate by space)}
+                            {--p|pretend : Dump the SQL queries that would be run}
                             {--f|skip-foreign-key-checks : Set FOREIGN_KEY_CHECKS=0 before migrate}
                             {--k|keep-batch : Keep batch number. (Only works in refresh mode)}
                             {--m|mode=default : Set migrate execution mode, supported mode have: default, rollback, refresh }
@@ -99,7 +100,13 @@ class MigrateSpecific extends Command {
         $this->migrator->setOutput($this->output);
 
         $options = array_filter([
+            'pretend' => $this->option('pretend'),
+            // 'step' => $this->option('step'),
         ]);
+
+        // When option 'pretend' is enabled then skip prompts.
+        if ( $this->option('pretend') ) {
+            $this->option('assume-yes', true);
         }
 
         $skipForeignKeyChecks = $this->option('skip-foreign-key-checks');
