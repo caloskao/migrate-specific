@@ -1,6 +1,6 @@
 {
     "name": "caloskao/migrate-specific",
-    "description": "The Laravel framework artisan CLI extension command. Easily perform database migrations of specific migration files.",
+    "description": "Migrate, rollback or refresh for specific migration files in the Laravel framework.",
     "type": "library",
     "keywords": [
         "database",
@@ -11,7 +11,7 @@
         "migrate"
     ],
     "require": {
-        "laravel/framework": "~5.4"
+        "laravel/framework": "~5.7"
     },
     "license": "MIT",
     "authors": [
