@@ -13,6 +13,7 @@ namespace CalosKao;
 
 use DB;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Schema;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 
@@ -23,17 +24,26 @@ class MigrateSpecific extends Command {
      * @var string
      */
     protected $signature = 'migrate:specific
-                            {files* : File path, support multiple file. (Sperate by space)}
+                            {files?* : File or directory path, support multiple file (Sperate by space)  [default: "database/migrations"]}
+                            {--p|pretend : Dump the SQL queries that would be run}
+                            {--f|skip-foreign-key-checks : Set FOREIGN_KEY_CHECKS=0 before migrate}
                             {--k|keep-batch : Keep batch number. (Only works in refresh mode)}
-                            {--m|mode=default : Set migrate execution mode, supported mode have: default, refresh, reset }
-                            {--y|assume-yes : Automatic yes to prompts; assume "yes" as answer to all prompts and run non-interactively. The process will be automatic assume yes as answer when  you used option "-n" or "-q". }';
+                            {--m|mode=default : Set migrate execution mode, supported mode have: default, rollback, refresh }
+                            {--y|assume-yes : Automatically assumes "yes" to run commands in non-interactive mode. This option is automatically enabled if you use the option "-n" or "-q" }';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Migrate, refresh, reset or rollback for specific migration files.';
+    protected $description = 'Migrate, rollback or refresh for specific migration files.';
+
+    /**
+     * Temporary store history batch number to restore when option -k is enabled.
+     *
+     * @var string
+     */
+    private $batchHistory;
 
     /**
      * Input migration files name.
@@ -42,19 +52,21 @@ class MigrateSpecific extends Command {
      */
     private $files;
 
+    private $repositoryTableName;
+
     /**
      * MigrateSpecific temporary path.
      *
      * @var string
      */
-    private $migratePath;
+    private $workingPath;
 
     /**
-     * Temporary store history batch number to restore when option -k is enabled.
+     * Package version.
      *
      * @var string
      */
-    private $batchHistory;
+    private $version = 'v2.0.0-beta.1';
 
     /**
      * Create a new command instance.
@@ -72,90 +84,93 @@ class MigrateSpecific extends Command {
      */
     public function handle() {
         $this->printHeaderInfo();
-        $mode = $this->option('mode');
-        if ( !in_array($mode, ['default', 'rollback', 'refresh', 'reset']) ) {
-            $this->error("Invalid migrate mode: {$mode}");
-            return false;
+
+        $this->checkMigrateMode();
+
+        $this->output->write('<comment>Create temporary working directory ... </>');
+        $this->preparePaths();
+        $this->info('ok');
+
+        $this->output->write('<comment>Copy files ... </>');
+        $this->prepareFiles();
+        $this->info('ok');
+
+        $this->repositoryTableName = config('database.migrations');
+        $this->migrator = app('migrator');
+        $this->migrator->setOutput($this->output);
+
+        $options = array_filter([
+            'pretend' => $this->option('pretend'),
+            // 'step' => $this->option('step'),
+        ]);
+
+        // When option 'pretend' is enabled then skip prompts.
+        if ( $this->option('pretend') ) {
+            $this->option('assume-yes', true);
         }
 
-        $files = $this->argument('files');
-        $tmpPath = tempnam(storage_path(), 'migrate-specific_');
-        if ( file_exists($tmpPath) ) {
-            unlink($tmpPath);
-        }
-        mkdir($tmpPath, 0777, true);
-        $this->migratePath = str_replace(base_path(), '', $tmpPath);;
+        $skipForeignKeyChecks = $this->option('skip-foreign-key-checks');
+
         try {
-            foreach ($files as $pathSrc) {
-                $pathDst = $tmpPath.'/'.basename($pathSrc);
-                copy($pathSrc, $pathDst);
+            
+            if ( !$this->confirmExecution() ) {
+                $this->comment('Abort.');
+                return false;
             }
 
-            $migrationsFilename = self::parseFilename(glob("{$tmpPath}/*"));
-            $isContinueConfirm = ( $this->option('assume-yes') || $this->option('quiet') || $this->option('no-interaction') );
-            if ( false === $isContinueConfirm ) {
-                $displayActionWord = 'migrated';
-                $warningMsg = "Warning: You have switched to {$mode} mode, which means the migrate:specific command will ";
-                switch ($mode) {
-                    case 'refresh':
-                        $displayActionWord = 'refreshed';
-                        $warningMsg .= 'refresh specific migrations and then execute the migrate command.';
-                        break;
-
-                    case 'reset':
-                        $displayActionWord = 'reset';
-                        $warningMsg .= 'reset specific migrations.';
-                        break;
-
-                    case 'rollback':
-                        $displayActionWord = 'rolled back';
-                        $warningMsg .= 'roll back specific migrations.';
-                        break;
-                }
-
-                $this->comment($warningMsg . PHP_EOL);
-                $this->line("The following migrations will be {$displayActionWord}:");
-                foreach ($migrationsFilename as $migration) {
-                    $this->line("  {$migration}");
-                }
-                if ( false === $this->confirm('Do you want to continue?') ) {
-                    $this->line('Abort.');
-                    return false;
-                }
-            }
-
-            switch ($mode) {
+            switch ( $this->option('mode') ) {
                 default:
-                case 'reset':
+                    $this->migrator->run($this->workingPath, $options);
+                    break;
+
                 case 'rollback':
-                    $this->line($this->migrate($mode));
+                    if ( $skipForeignKeyChecks ) {
+                        $this->setForeignKeyChecks(0);
+                    }
+                    $this->moveMigrationsToDdHead();
+                    $this->migrator->rollback($this->workingPath, $options);
                     break;
 
                 case 'refresh':
                     if ($this->option('keep-batch')) {
-                        $this->backupBatchHistory($migrationsFilename);
-                        $this->comment('');
+                        $this->output->write('<comment>Backup repository batches ... </>');
+                        $this->backupBatchHistory();
+                        $this->info('ok');
                     }
-                    $newBatchNumber = (int)DB::table('migrations')->max('batch') + 1;
-                    $countExistsMigration = DB::table('migrations')
-                        ->whereIn('migration', $migrationsFilename)
-                        ->update(['batch' => $newBatchNumber]);
 
-                    // If migration status is migrated, reset it first.
-                    if ( 0 < $countExistsMigration ) {
-                        $this->line($this->migrate('reset'));
+                    $this->moveMigrationsToDdHead();
+
+                    if ( $skipForeignKeyChecks ) {
+                        $this->setForeignKeyChecks(0);
                     }
-                    $this->call('migrate', ['--path' => $this->migratePath]);
+
+                    $this->migrator->rollback($this->workingPath, $options);
+                    
+                    if ( $skipForeignKeyChecks ) {
+                        $this->setForeignKeyChecks(1);
+                    }
+                    
+                    $this->migrator->run($this->workingPath, $options);
 
                     if ($this->option('keep-batch')) {
                         $this->restoreBatchHistory();
+                        $this->output->write('<comment>Restore repository batches ... </>');
+                        $this->backupBatchHistory();
+                        $this->info('ok');
                     }
                     break;
             }
-
+        } catch (\Exception $e) {
+            $this->error($e->getMessage());
+            $this->comment("\nAbort.");
         } finally {
-            array_map('unlink', glob($tmpPath."/*"));
-            rmdir($tmpPath);
+            if ( file_exists($this->workingPath) ) {
+                $this->output->write('<comment>Clear temporary working directory ... </>');
+                array_map('unlink', glob($this->workingPath."/*"));
+                rmdir($this->workingPath);
+                $this->info("done");
+            }
+            $this->line('');
         }
     }
 
@@ -165,88 +180,179 @@ class MigrateSpecific extends Command {
      * @return void
      */
     private function printHeaderInfo() {
-        $this->comment('MigrateSpecific v1.3.2');
-        $this->line('Copyright (C) 2018 by Calos Kao');
-        $this->line('If you have any problem or bug about the use, please come to Github to open the question.');
+        $this->comment('MigrateSpecific '.$this->version);
+        $this->line('Copyright (C) 2019 by Calos Kao');
+        $this->line('If you have any problems with your use, please visit the GitHub repository.');
         $this->info('https://github.com/caloskao/migrate-specific'.PHP_EOL);
     }
 
     /**
-     * Call artisan migrate command.
-     *
-     * @param  string $mode The artisan migrate command execute mode, avairable option: default, refresh, reset.
-     *
-     * @return string $value Sub command output.
-     */
-    private function migrate($mode = 'default') {
-        $mode = ('default' === $mode ? '' : ":{$mode}");
-        return $this->callArtisanBySymfony("migrate{$mode}", ['--path' => $this->migratePath], 'not found');
-    }
-
-    /**
-     * Backup migration original batch.
-     *
-     * @param  array $migrations The database records of migrations.
+     * Validate input option 'mode'.
      *
      * @return void
      */
-    private function backupBatchHistory(array $migrations) {
-        $this->batchHistory = DB::table('migrations')
-            ->whereIn('migration', $migrations)
+    private function checkMigrateMode() {
+        $mode = $this->option('mode');
+        if ( !in_array($mode, ['default', 'rollback', 'refresh']) ) {
+            throw new \Exception("Invalid migrate mode: {$mode}");
+        }
+    }
+
+    /**
+     * Prepare temporary working directory paths.
+     *
+     * @return void
+     */
+    private function preparePaths() {
+        $this->workingPath = tempnam(storage_path(), 'migrate-specific_');
+        if ( file_exists($this->workingPath) ) {
+            unlink($this->workingPath);
+        }
+        mkdir($this->workingPath, 0777, true);
+    }
+
+    /**
+     * Copy target migration files to temporary working directory.
+     *
+     * @return void
+     */
+    private function prepareFiles($files = null) {
+        if ( null === $files ) {
+            $files = $this->argument('files');
+            if ( [] === $files ) {
+                $files = glob(base_path().'/database/migrations/*');
+            }
+        }
+        foreach ($files as $pathSrc) {
+            if ( is_dir($pathSrc) ) {
+                $this->prepareFiles( glob($pathSrc.'/*') );
+            } else {
+                $pathDst = $this->workingPath.'/'.basename($pathSrc);
+                copy($pathSrc, $pathDst);
+            }
+        }
+    }
+
+    /**
+     * Print confirmation prompt of migrate plan.
+     *
+     * @return bool Confirm result..
+     */
+    private function confirmExecution() {
+        $isContinueConfirm = ( $this->option('assume-yes') || $this->option('quiet') || $this->option('no-interaction') );
+        if ( $isContinueConfirm ) {
+            return true;
+        } else {
+            if ( $this->option('skip-foreign-key-checks') ) {
+                $this->comment("Warning: Option 'skip-foreign-key-checks' is enabled.");
+            }
+
+            $mode = $this->option('mode');
+            $displayActionWord = 'migrated';
+            $warningMsg = "Warning: You have switched to {$mode} mode, the migrate:specific command will ";
+            switch ($mode) {
+                case 'refresh':
+                    $displayActionWord = 'refreshed';
+                    $warningMsg .= 'refresh specific migrations and then execute the migrate command.';
+                    break;
+
+                case 'reset':
+                    $displayActionWord = 'reset';
+                    $warningMsg .= 'reset specific migrations.';
+                    break;
+
+                case 'rollback':
+                    $displayActionWord = 'rolled back';
+                    $warningMsg .= 'roll back specific migrations.';
+                    break;
+            }
+
+            $this->comment($warningMsg . PHP_EOL);
+            $this->line("The following migrations will be {$displayActionWord}:");
+            foreach ($this->getMigrations() as $migration) {
+                $this->line("  {$migration}");
+            }
+
+            return $this->confirm('Do you want to continue?');
+        }
+    }
+
+    /**
+     * Retrive database query builder.
+     *
+     * @return \Illuminate\Database\Query\Builder
+     */
+    private function getRepository() {
+        return DB::table($this->repositoryTableName);
+    }
+
+    /**
+     * Backup migrations original batch.
+     *
+     * @return void
+     */
+    private function backupBatchHistory() {
+        $this->batchHistory = $this->getRepository()
+            ->whereIn('migration', $this->getMigrations())
             ->get()
             ->toArray();
     }
 
     /**
-     * Restore migration original batch and id.
+     * Restore migrations original batch.
      *
      * @return void
      */
     private function restoreBatchHistory() {
         foreach ($this->batchHistory as $item) {
-            DB::table('migrations')
+            $this->getRepository()
                 ->where('migration', $item->migration)
-                ->update([
-                    'id'    => $item->id,
-                    'batch' => $item->batch,
-                ]);
+                ->update(['batch' => $item->batch]);
         }
     }
 
     /**
-     * Call artisan command by Symfony.
+     * Move target migrations batch to head of repository.
      *
-     * @param  string $command           Artisan command name.
-     * @param  array  $args              Command arguments.
-     * @param  string $lineFilterKeyword Filter output line by keyword.
-     *
-     * @return string Command output.
+     * @return void
      */
-    private function callArtisanBySymfony($command, array $args = [], $lineFilterKeyword = null) {
-        $output = new BufferedOutput;
-        $instance = $this->getApplication()->find($command);
-        $instance->run(new ArrayInput($args), $output);
-        $outputText = $output->fetch();
-        if ( null !== $lineFilterKeyword ) {
-            $lines = collect(explode(PHP_EOL, $outputText));
-            $outputText = $lines->filter(function($item) use ($lineFilterKeyword){
-                return ( false === strpos($item, $lineFilterKeyword) );
-            })->implode(PHP_EOL);
-        }
-        return $outputText;
+    private function moveMigrationsToDdHead() {
+        $nextBatchNumber = $this->migrator->getRepository()->getNextBatchNumber();
+        $this->getRepository()
+            ->whereIn('migration', $this->getMigrations())
+            ->update(['batch' => $nextBatchNumber]);
     }
 
     /**
-     * Strip path and extension for files.
+     * Set foreign key checks.
      *
-     * @param array $files The full path infomation of the file.
+     * @param  bool $turnOn Turn on.
      *
-     * @return array File names.
+     * @return void
      */
-    private static function parseFilename(array $files){
-        return collect($files)->map(function($path){
-            $basename = basename($path);
-            return substr($basename, 0, strrpos($basename, '.'));
-        })->toArray();
+    private function setForeignKeyChecks(bool $turnOn = true) {
+        $this->output->write('<comment>'.($turnOn ? 'Enable' : 'Disable').' foreign key checkes ... </>');
+        $turnOn
+            ? Schema::enableForeignKeyConstraints()
+            : Schema::disableForeignKeyConstraints();
+        $this->info('ok');
+    }
+
+    /**
+     * Retrieve migrations file path.
+     *
+     * @return array Migrations file path.
+     */
+    private function getMigrationFiles(){
+        return $this->migrator->getMigrationFiles($this->workingPath);
+    }
+
+    /**
+     * Retrieve migrations name.
+     *
+     * @return array Migrations name.
+     */
+    private function getMigrations(){
+        return array_keys($this->getMigrationFiles());
     }
 }
