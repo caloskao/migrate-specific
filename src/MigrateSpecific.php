@@ -13,6 +13,7 @@ namespace CalosKao;
 
 use DB;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Schema;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 
@@ -24,6 +25,7 @@ class MigrateSpecific extends Command {
      */
     protected $signature = 'migrate:specific
                             {files?* : File or directory path, support multiple file (Sperate by space)}
+                            {--f|skip-foreign-key-checks : Set FOREIGN_KEY_CHECKS=0 before migrate}
                             {--k|keep-batch : Keep batch number. (Only works in refresh mode)}
                             {--m|mode=default : Set migrate execution mode, supported mode have: default, rollback, refresh }
                             {--y|assume-yes : Automatically assumes "yes" to run commands in non-interactive mode. This option is automatically enabled if you use the option "-n" or "-q" }';
@@ -100,6 +102,8 @@ class MigrateSpecific extends Command {
         ]);
         }
 
+        $skipForeignKeyChecks = $this->option('skip-foreign-key-checks');
+
         try {
             
             if ( !$this->confirmExecution() ) {
@@ -113,6 +117,9 @@ class MigrateSpecific extends Command {
                     break;
 
                 case 'rollback':
+                    if ( $skipForeignKeyChecks ) {
+                        $this->setForeignKeyChecks(0);
+                    }
                     $this->moveMigrationsToDdHead();
                     $this->migrator->rollback($this->workingPath, $options);
                     break;
@@ -126,9 +133,15 @@ class MigrateSpecific extends Command {
 
                     $this->moveMigrationsToDdHead();
 
+                    if ( $skipForeignKeyChecks ) {
+                        $this->setForeignKeyChecks(0);
                     }
 
                     $this->migrator->rollback($this->workingPath, $options);
+                    
+                    if ( $skipForeignKeyChecks ) {
+                        $this->setForeignKeyChecks(1);
+                    }
                     
                     $this->migrator->run($this->workingPath, $options);
 
@@ -310,6 +323,14 @@ class MigrateSpecific extends Command {
      *
      * @return void
      */
+    private function setForeignKeyChecks(bool $turnOn = true) {
+        $this->output->write('<comment>'.($turnOn ? 'Enable' : 'Disable').' foreign key checkes ... </>');
+        $turnOn
+            ? Schema::enableForeignKeyConstraints()
+            : Schema::disableForeignKeyConstraints();
+        $this->info('ok');
+    }
+
     /**
      * Retrieve migrations file path.
      *
