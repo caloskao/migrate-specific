@@ -102,6 +102,7 @@ class MigrateSpecific extends Command {
         $options = array_filter([
             'pretend' => $this->option('pretend'),
             // 'step' => $this->option('step'),
+            'force' => true,
         ]);
 
         // When option 'pretend' is enabled then skip prompts.
