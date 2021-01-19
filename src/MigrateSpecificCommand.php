@@ -9,7 +9,7 @@
  * file that was distributed with this source code.
  */
 
-namespace CalosKao;
+namespace CalosKao\MigrateSpecific;
 
 use DB;
 use Illuminate\Console\Command;
@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Schema;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 
-class MigrateSpecific extends Command {
+class MigrateSpecificCommand extends Command {
     /**
      * The name and signature of the console command.
      *
@@ -36,7 +36,7 @@ class MigrateSpecific extends Command {
      *
      * @var string
      */
-    protected $description = 'Migrate, rollback or refresh for specific migration files.';
+    protected $description = 'Easily perform database migrations of specific migration files in the Laravel framework.';
 
     /**
      * Temporary store history batch number to restore when option -k is enabled.
@@ -62,13 +62,6 @@ class MigrateSpecific extends Command {
     private $workingPath;
 
     /**
-     * Package version.
-     *
-     * @var string
-     */
-    private $version = 'v2.0.0-beta.1';
-
-    /**
      * Create a new command instance.
      *
      * @return void
@@ -85,87 +78,15 @@ class MigrateSpecific extends Command {
     public function handle() {
         $this->printHeaderInfo();
 
-        $this->checkMigrateMode();
-
-        $this->output->write('<comment>Create temporary working directory ... </>');
-        $this->preparePaths();
-        $this->info('ok');
-
-        $this->output->write('<comment>Copy files ... </>');
-        $this->prepareFiles();
-        $this->info('ok');
-
-        $this->repositoryTableName = config('database.migrations');
-        $this->migrator = app('migrator');
-        $this->migrator->setOutput($this->output);
-
-        $options = array_filter([
-            'pretend' => $this->option('pretend'),
-            // 'step' => $this->option('step'),
-        ]);
-
-        // When option 'pretend' is enabled then skip prompts.
-        if ( $this->option('pretend') ) {
-            $this->option('assume-yes', true);
-        }
-
-        $skipForeignKeyChecks = $this->option('skip-foreign-key-checks');
-
         try {
-            
-            if ( !$this->confirmExecution() ) {
-                $this->comment('Abort.');
-                return false;
-            }
-
-            switch ( $this->option('mode') ) {
-                default:
-                    $this->migrator->run($this->workingPath, $options);
-                    break;
-
-                case 'rollback':
-                    if ( $skipForeignKeyChecks ) {
-                        $this->setForeignKeyChecks(0);
-                    }
-                    $this->moveMigrationsToDdHead();
-                    $this->migrator->rollback($this->workingPath, $options);
-                    break;
-
-                case 'refresh':
-                    if ($this->option('keep-batch')) {
-                        $this->output->write('<comment>Backup repository batches ... </>');
-                        $this->backupBatchHistory();
-                        $this->info('ok');
-                    }
-
-                    $this->moveMigrationsToDdHead();
-
-                    if ( $skipForeignKeyChecks ) {
-                        $this->setForeignKeyChecks(0);
-                    }
-
-                    $this->migrator->rollback($this->workingPath, $options);
-                    
-                    if ( $skipForeignKeyChecks ) {
-                        $this->setForeignKeyChecks(1);
-                    }
-                    
-                    $this->migrator->run($this->workingPath, $options);
-
-                    if ($this->option('keep-batch')) {
-                        $this->restoreBatchHistory();
-                        $this->output->write('<comment>Restore repository batches ... </>');
-                        $this->backupBatchHistory();
-                        $this->info('ok');
-                    }
-                    break;
-            }
+            $this->init();
+            $this->runMigrate();
         } catch (\Exception $e) {
             $this->error($e->getMessage());
             $this->comment("\nAbort.");
         } finally {
             if ( file_exists($this->workingPath) ) {
-                $this->output->write('<comment>Clear temporary working directory ... </>');
+                $this->output->write(PHP_EOL.'<comment>Clear temporary working directory ... </>');
                 array_map('unlink', glob($this->workingPath."/*"));
                 rmdir($this->workingPath);
                 $this->info("done");
@@ -175,15 +96,122 @@ class MigrateSpecific extends Command {
     }
 
     /**
+     * Initialize options and migrations.
+     *
+     * @return void
+     */
+    private function init()
+    {
+        $this->checkMigrateMode();
+
+        $this->output->write('Create temporary working directory ... ');
+        $this->preparePaths();
+        $this->info('ok');
+
+        $this->output->write('Copy files ... ');
+        $this->prepareFiles();
+        $this->info('ok');
+
+        $this->repositoryTableName = config('database.migrations');
+        $this->migrator = app('migrator');
+        $this->migrator->setOutput($this->output);
+    }
+
+    /**
+     * Run migrate.
+     *
+     * @return void
+     */
+    private function runMigrate()
+    {
+        $options = array_filter([
+            'pretend' => $this->option('pretend'),
+            'force'   => true,
+        ]);
+
+        $skipForeignKeyChecks = $this->option('skip-foreign-key-checks');
+
+        if ( !$this->confirmExecution() ) {
+            $this->comment('Abort.');
+            return false;
+        }
+
+        switch ( $this->option('mode') ) {
+            default:
+                $this->migrator->run($this->workingPath, $options);
+                break;
+
+            case 'rollback':
+                if ( $skipForeignKeyChecks ) {
+                    $this->setForeignKeyChecks(0);
+                }
+                $this->moveMigrationsToDdHead();
+                $this->migrator->rollback($this->workingPath, $options);
+                break;
+
+            case 'refresh':
+                if ($this->option('keep-batch')) {
+                    $this->output->write('<comment>Backup repository batches ... </>');
+                    $this->backupBatchHistory();
+                    $this->info('ok');
+                }
+
+                $this->moveMigrationsToDdHead();
+
+                if ( $skipForeignKeyChecks ) {
+                    $this->setForeignKeyChecks(0);
+                }
+
+                $this->migrator->rollback($this->workingPath, $options);
+                
+                if ( $skipForeignKeyChecks ) {
+                    $this->setForeignKeyChecks(1);
+                }
+                
+                $this->migrator->run($this->workingPath, $options);
+
+                if ($this->option('keep-batch')) {
+                    $this->restoreBatchHistory();
+                    $this->output->write('<comment>Restore repository batches ... </>');
+                    $this->backupBatchHistory();
+                    $this->info('ok');
+                }
+                break;
+        }
+    }
+
+    /**
      * Print package infomation.
      *
      * @return void
      */
     private function printHeaderInfo() {
-        $this->comment('MigrateSpecific '.$this->version);
-        $this->line('Copyright (C) 2019 by Calos Kao');
-        $this->line('If you have any problems with your use, please visit the GitHub repository.');
-        $this->info('https://github.com/caloskao/migrate-specific'.PHP_EOL);
+        $packageInfo = $this->getPackageInfo();
+        $version = data_get($packageInfo, 'version');
+        $repoUrl = data_get($packageInfo, 'source.url', 'https://github.com/caloskao/migrate-specific');
+        $this->comment("MigrateSpecific {$version}");
+        $this->info('Copyright (C) 2019 by Calos Kao');
+        $this->info('If you have any problems while using, please visit the GitHub repository.');
+        $this->info($repoUrl.PHP_EOL);
+    }
+
+    /**
+     * Get installed version information from `composer.lock`.
+     *
+     * @return object
+     */
+    private function getPackageInfo()
+    {
+        $composerLockPath = base_path('composer.lock');
+        if ( !is_file($composerLockPath) ) {
+            throw new Exception("File `composer.json` not found");
+        }
+        $composerLock = file_get_contents($composerLockPath);
+
+        return collect( json_decode($composerLock) )
+            ->only('packages', 'packages-dev')
+            ->flatten(1)
+            ->firstWhere('name', 'caloskao/migrate-specific');
     }
 
     /**
@@ -239,36 +267,48 @@ class MigrateSpecific extends Command {
      * @return bool Confirm result..
      */
     private function confirmExecution() {
-        $isContinueConfirm = ( $this->option('assume-yes') || $this->option('quiet') || $this->option('no-interaction') );
+        $isContinueConfirm = (
+            $this->option('assume-yes') ||
+            $this->option('pretend') || // When option 'pretend' is enabled then skip prompts.
+            $this->option('quiet') ||
+            $this->option('no-interaction')
+        );
+
         if ( $isContinueConfirm ) {
             return true;
         } else {
             if ( $this->option('skip-foreign-key-checks') ) {
-                $this->comment("Warning: Option 'skip-foreign-key-checks' is enabled.");
+                $this->comment("\nWarning: Option 'skip-foreign-key-checks' is enabled.");
             }
 
             $mode = $this->option('mode');
             $displayActionWord = 'migrated';
-            $warningMsg = "Warning: You have switched to {$mode} mode, the migrate:specific command will ";
-            switch ($mode) {
-                case 'refresh':
-                    $displayActionWord = 'refreshed';
-                    $warningMsg .= 'refresh specific migrations and then execute the migrate command.';
-                    break;
+            
+            if ( 'default' !== $mode ) {
+                $warningMsg = "\nWarning: You have switched to {$mode} mode, the migrate:specific command will ";
+                
+                switch ($mode) {
+                    case 'refresh':
+                        $displayActionWord = 'refreshed';
+                        $warningMsg .= 'refresh specific migrations and then execute the migrate command.';
+                        break;
 
-                case 'reset':
-                    $displayActionWord = 'reset';
-                    $warningMsg .= 'reset specific migrations.';
-                    break;
+                    case 'reset':
+                        $displayActionWord = 'reset';
+                        $warningMsg .= 'reset specific migrations.';
+                        break;
 
-                case 'rollback':
-                    $displayActionWord = 'rolled back';
-                    $warningMsg .= 'roll back specific migrations.';
-                    break;
+                    case 'rollback':
+                        $displayActionWord = 'rolled back';
+                        $warningMsg .= 'roll back specific migrations.';
+                        break;
+                }
+
+                $this->comment($warningMsg . PHP_EOL);
             }
 
-            $this->comment($warningMsg . PHP_EOL);
-            $this->line("The following migrations will be {$displayActionWord}:");
+            $this->comment("The following migrations will be {$displayActionWord}:");
+
             foreach ($this->getMigrations() as $migration) {
                 $this->line("  {$migration}");
             }
